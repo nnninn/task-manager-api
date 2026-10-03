@@ -1,10 +1,11 @@
 from fastapi import FastAPI, HTTPException, Depends
+from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel, ConfigDict, EmailStr
 from sqlalchemy.orm import Session
 
 from db import engine, SessionLocal, Base
 from models import TaskDB, UserDB
-from security import hash_password
+from security import hash_password, verify_password, create_access_token
 
 # Cipta table dalam database kalau belum ada
 Base.metadata.create_all(bind=engine)
@@ -62,6 +63,18 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(db_user)
     return db_user
+
+
+@app.post("/login")
+def login(
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: Session = Depends(get_db),
+):
+    user = db.query(UserDB).filter(UserDB.email == form_data.username).first()
+    if user is None or not verify_password(form_data.password, user.hashed_password):
+        raise HTTPException(status_code=401, detail="Incorrect email or password")
+    token = create_access_token(user.id)
+    return {"access_token": token, "token_type": "bearer"}
 
 
 @app.post("/tasks", response_model=TaskResponse)
