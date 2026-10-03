@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey
 from db import Base
 
 
@@ -9,6 +9,7 @@ class TaskDB(Base):
     title = Column(String, nullable=False)
     description = Column(String, default="")
     done = Column(Boolean, default=False)
+    owner_id = Column(Integer, ForeignKey("users.id"), nullable=False)
 
 
 class UserDB(Base):
