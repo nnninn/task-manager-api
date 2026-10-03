@@ -1,9 +1,10 @@
 from fastapi import FastAPI, HTTPException, Depends
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, EmailStr
 from sqlalchemy.orm import Session
 
 from db import engine, SessionLocal, Base
-from models import TaskDB
+from models import TaskDB, UserDB
+from security import hash_password
 
 # Cipta table dalam database kalau belum ada
 Base.metadata.create_all(bind=engine)
@@ -24,6 +25,19 @@ class TaskResponse(TaskCreate):
     model_config = ConfigDict(from_attributes=True)
 
 
+# Data untuk register user
+class UserCreate(BaseModel):
+    email: EmailStr
+    password: str
+
+
+# Data user yang dihantar balik (TIADA password)
+class UserResponse(BaseModel):
+    id: int
+    email: EmailStr
+    model_config = ConfigDict(from_attributes=True)
+
+
 # Buka sambungan database untuk setiap request, tutup bila siap
 def get_db():
     db = SessionLocal()
@@ -36,6 +50,18 @@ def get_db():
 @app.get("/")
 def home():
     return {"message": "Hello, Task Manager API!"}
+
+
+@app.post("/register", response_model=UserResponse)
+def register(user: UserCreate, db: Session = Depends(get_db)):
+    existing = db.query(UserDB).filter(UserDB.email == user.email).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Email already registered")
+    db_user = UserDB(email=user.email, hashed_password=hash_password(user.password))
+    db.add(db_user)
+    db.commit()
+    db.refresh(db_user)
+    return db_user
 
 
 @app.post("/tasks", response_model=TaskResponse)
